@@ -1,0 +1,36 @@
+model_opts:
+  model: Static
+  backbone: vgg16
+  obs_input_type: [pose, box, local_context] #[pose, box, local_context] for JAAD, [pose, speed, box, local_context] for PIE
+  enlarge_ratio: 1.5 # enlarging the original bounding box to capture local spatial context
+  obs_length: 16
+  time_to_event: 30
+  min_encoding_len: 106
+  overlap: 0.8 #0.8 for JAAD, 0.6 for PIE
+  balance_data: False # set to True to resample data so that the number of samples in each class is the same
+  apply_class_weights: True # apply class weights to offset class imbalance
+  dataset: jaad
+  normalize_boxes: True
+  generator: True # using generator is slower but uses less memory, otherwise up to 64GB RAM may be required to run some of the models
+  path_to_pose: ./data/features/jaad/poses #./data/features/pie/poses for PIE
+  batch_size: 128
+  hidden: 1024
+  dropout: 0.1
+  interval: 30
+  classifier_activation: sigmoid
+  classifier_loss: binary_crossentropy
+  epochs: 100
+  optimizer: adam
+  lr: 0.001 #0.001 for JAAD, 0.0001 for PIE
+  model_path: ./models #path to load and save models
+  step: 3
+  seq_len: 136
+  feat_size: [36, 4, 512] #[36, 4, 512] for JAAD, [36, 1, 4, 512] for PIE
+data_opts:
+  fstride: 1
+  sample_type: beh  #beh or all for JAAD, all for PIE
+  subset: default
+  data_split_type: default  # kfold, random, default
+  seq_type: crossing
+  min_track_size: 16 # tracks shorter than this length will be discarded
+  path_to_dataset: ./ #path to the images folder
