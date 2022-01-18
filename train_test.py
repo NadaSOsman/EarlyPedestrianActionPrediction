@@ -17,25 +17,25 @@ sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=sessi
 K.set_session(sess)
 
 from early_pred_data_generator import DataGenerator, DataLoader
-from early_pred_model import EarlyPrediction
+from early_pred_model import EarlyPredictionModel
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description="Train-Test program for Early_Intention_Prediction")
-    parser.add_argument('--config_file', type=str, help="Path to the directory to load the config file")
+    parser.add_argument('--configs_file', type=str, help="Path to the directory to load the config file")
     parser.add_argument('--pretrain', action='store_true')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--fusion', action='store_true')
 
     args = parser.parse_args()
 
-     with open((args.config_file, 'r') as f:
-            configs = yaml.safe_load(f)
+    with open(args.configs_file, 'r') as f:
+        configs = yaml.safe_load(f)
 
     data_loader = DataLoader(opts=configs, fusion=args.fusion)
-    data_generators = dada_loader.get_data_generators(['train', 'test', 'val'])
+    data_generators = data_loader.get_data_generators(['train', 'test', 'val'])
 
-    early_pred_model = EarlyPrediction(opts=args.config_file, data_generators=data_generators, pretrain=args.pretrain, fusion=args.fusion)
+    early_pred_model = EarlyPredictionModel(opts=configs, data_generators=data_generators, pretrain=args.pretrain, fusion=args.fusion)
 
     if not args.test:
         early_pred_model.train()

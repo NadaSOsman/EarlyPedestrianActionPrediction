@@ -9,13 +9,13 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, LSTM, Dropout, RepeatVector, Lambda, GlobalMaxPooling2D, Concatenate, BatchNormalization, Softmax
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 from early_pred_data_generator import DataGenerator, DataLoader
-
+from tensorflow.compat.v1.keras import backend as K
 
 
 class EarlyPredictionModel(object):
-    def __init__(self, opts=None, data_generators={}, pretrain=pretrain, fusion=fusion):
+    def __init__(self, opts=None, data_generators={}, pretrain=False, fusion=False):
         self.opts = opts
-        self.data_generators = data_generator
+        self.data_generators = data_generators
         self.pretrain = pretrain
         self.fusion = fusion
 
@@ -60,9 +60,9 @@ class EarlyPredictionModel(object):
         optimizer = self.get_optimizer(self.opts['model_opts']['optimizer'])()
         if(self.opts['model_opts']['apply_class_weights']):
             w = [class_w[0], class_w[1]]
-            model.compile(loss=self.weighted_binary_crossentropy(weights=w), optimizer=optimizer, metrics=['accuracy'])
+            self.model.compile(loss=self.weighted_binary_crossentropy(weights=w), optimizer=optimizer, metrics=['accuracy'])
         else:
-            model.compile(loss=self.opts['model_opts']['classifier_loss'], optimizer=optimizer, metrics=['accuracy'])
+            self.model.compile(loss=self.opts['model_opts']['classifier_loss'], optimizer=optimizer, metrics=['accuracy'])
 
         checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=self.model_path,
                                                                  save_weights_only=True,
@@ -70,13 +70,13 @@ class EarlyPredictionModel(object):
                                                                  mode='max',
                                                                  save_best_only=True)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs")
-        history = model.fit(x=data_train['data'][0],
-                            y=None if self._generator else self.data_generators['train']['data'][1],
-                            batch_size=self.opts['model_opts']['batch_size'],
-                            epochs=self.opts['model_opts']['epochs'],
-                            validation_data=self.data_generators['val']['data'][0],
-                            verbose=1,
-                            callbacks=[tensorboard_callback, checkpoint_callback])
+        history = self.model.fit(x=self.data_generators['train']['data'][0],
+                                 y=None if self.data_generators['train']['data'][0] else self.data_generators['train']['data'][1],
+                                 batch_size=self.opts['model_opts']['batch_size'],
+                                 epochs=self.opts['model_opts']['epochs'],
+                                 validation_data=self.data_generators['val']['data'][0],
+                                 verbose=1,
+                                 callbacks=[tensorboard_callback, checkpoint_callback])
 
 
 
@@ -214,19 +214,19 @@ class EarlyPredictionModel(object):
         model = Model(inputs=inputs, outputs=outputs, name='fusion')
         return model
 
-    def rulstm(self feat_size=40):
-        input_seq = Input((self.opts['seq_len'], feat_size if self.fusion else self.opts['feat_size']))
-        step = self.opts['step']
-        sampled_seq = tf.concat([Lambda(lambda s: s[:,0:self.opts['obs_length']:step])(input_seq),\
-                                 Lambda(lambda s: s[:,self.opts['obs_length']::step])(input_seq)], 1)
+    def rulstm(self, feat_size=40):
+        input_seq = Input((self.opts['model_opts']['seq_len'], feat_size if self.fusion else self.opts['model_opts']['feat_size']))
+        step = self.opts['model_opts']['step']
+        sampled_seq = tf.concat([Lambda(lambda s: s[:,0:self.opts['model_opts']['obs_length']:step])(input_seq),\
+                                 Lambda(lambda s: s[:,self.opts['model_opts']['obs_length']::step])(input_seq)], 1)
         sampled_seq = BatchNormalization()(sampled_seq)
         seq_len = sampled_seq.shape[1]
         outputs = []
         contexts = []
         h = None
         c = None
-        rolling_lstm = LSTM(self.opts['hidden'], dropout=self.opts['dropout'], return_state=True)
-        unrolling_lstm = LSTM(self.opts['hidden'], dropout=self.opts['dropout'])
+        rolling_lstm = LSTM(self.opts['model_opts']['hidden'], dropout=self.opts['model_opts']['dropout'], return_state=True)
+        unrolling_lstm = LSTM(self.opts['model_opts']['hidden'], dropout=self.opts['model_opts']['dropout'])
         for i in range(seq_len):
             input = Lambda(lambda s,i=i: s[:,i:i+1])(sampled_seq)
             if(h != None and c != None):
@@ -234,20 +234,20 @@ class EarlyPredictionModel(object):
             else:
                 _, h, c = rolling_lstm(input)
 
-            ifself.(pretrain):
+            if self.pretrain:
                 input_unrolling = Lambda(lambda s,i=i: s[:,i:])(sampled_seq)
             else:
                 input_unrolling = RepeatVector(seq_len-i)(Lambda(lambda s,i=i: s[:,i])(sampled_seq))
             x_h = unrolling_lstm(input_unrolling, initial_state=[h, c])
-            x = Dropout(self.opts['dropout'])(x_h)
-            x = Dense(int(self.opts['hidden']/2), activation='relu')(x)
-            x = Dense(int(self.opts['hidden']/4), activation='relu')(x)
-            x = Dense(int(self.opts['hidden']/8), activation='relu')(x)
-            y = Dense(self.opts['num_classes'], activation=self.opts['classifier_activation'], name='output_'+str(i))(x)
-            if(i>int(self.opts['obs_length']/step)):
+            x = Dropout(self.opts['model_opts']['dropout'])(x_h)
+            x = Dense(int(self.opts['model_opts']['hidden']/2), activation='relu')(x)
+            x = Dense(int(self.opts['model_opts']['hidden']/4), activation='relu')(x)
+            x = Dense(int(self.opts['model_opts']['hidden']/8), activation='relu')(x)
+            y = Dense(self.opts['model_opts']['num_classes'], activation=self.opts['model_opts']['classifier_activation'], name='output_'+str(i))(x)
+            if(i>int(self.opts['model_opts']['obs_length']/step)):
                 outputs.append(y)
                 contexts.append(tf.concat([x_h, c], -1))
 
-        model_outputs = outputs+contexts if fusion else outputs
+        model_outputs = outputs+contexts if self.fusion else outputs
         model = Model(input_seq, model_outputs, name='rulstm')
         return model

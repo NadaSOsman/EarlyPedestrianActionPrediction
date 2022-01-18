@@ -7,6 +7,7 @@ import pickle
 import cv2
 from tensorflow.keras.applications import vgg16, resnet50, mobilenet
 from tensorflow.keras.preprocessing.image import load_img
+from tensorflow.keras.utils import Sequence, to_categorical, normalize
 
 class DataGenerator(Sequence):
 
@@ -108,8 +109,8 @@ class DataLoader(object):
     def __init__(self, opts=None, fusion=False):
         self._generator = None
         self.opts = opts
-        self._global_pooling = opts['global_pooling']
-        self._backbone = opts['backbone']
+        self._global_pooling = opts['model_opts']['global_pooling']
+        self._backbone = opts['model_opts']['backbone']
         self.fusion = fusion
 
     def get_data_generators(self, data_splits):

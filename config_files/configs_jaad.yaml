@@ -1,6 +1,7 @@
 model_opts:
   model: Static
   backbone: vgg16
+  global_pooling: avg
   obs_input_type: [pose] #possible types [pose, box, speed, local_context, local_box]
   enlarge_ratio: 1.5 # enlarging the original bounding box to capture local spatial context
   obs_length: 16
@@ -12,7 +13,7 @@ model_opts:
   dataset: jaad
   normalize_boxes: True
   generator: True # using generator is slower but uses less memory, otherwise up to 64GB RAM may be required to run some of the models
-  path_to_pose: ./data/features/jaad/poses #path to poses features if used
+  path_to_pose: /home/osman/storage/datasets/JAAD/JAAD/poses #path to poses features if used
   batch_size: 128
   hidden: 1024
   dropout: 0.2 #0.2 during pretraining, 0.1 during training
@@ -22,6 +23,7 @@ model_opts:
   epochs: 100
   optimizer: adam
   lr: 0.001
+  num_classes: 1
   model_path: ./models #path to load and save models
   step: 3
   seq_len: 136
@@ -33,4 +35,4 @@ data_opts:
   data_split_type: default  # kfold, random, default
   seq_type: crossing
   min_track_size: 16 # tracks shorter than this length will be discarded
-  path_to_dataset: ./ #path to the images folder
+  path_to_dataset: /home/osman/storage/datasets/JAAD/JAAD/ #path to the images folder
