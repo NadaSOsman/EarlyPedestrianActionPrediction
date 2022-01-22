@@ -14,14 +14,14 @@ model_opts:
   generator: True # using generator is slower but uses less memory, otherwise up to 64GB RAM may be required to run some of the models
   path_to_pose: ./data/features/pie/poses #path to poses features if used
   batch_size: 128
-  hidden: 1024
-  dropout: 0.2 #0.2 during pretraining, 0.1 during training
+  hidden: 512
+  dropout: 0.0 #0.0 pose, 0.0 box, 0.0 speed, 0.8 local context
   interval: 30
   classifier_activation: sigmoid
   classifier_loss: binary_crossentropy
   epochs: 100
-  optimizer: adam
-  lr: 0.001 #0.001 during pretraining, 0.0001 during training 
+  optimizer: sgd
+  lr: 0.1
   model_path: ./models #path to load and save models
   step: 3
   seq_len: 136

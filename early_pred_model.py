@@ -174,7 +174,8 @@ class EarlyPredictionModel(object):
 
     def fusion_rusltm(self, models=[]):
         step = self.opts['step']
-        units = 2*len(models)*self.opts['hidden']
+        hidden = 512 #1024 for jaad_beh
+        units = 2*len(models)*hidden
         inputs = []
         models_pred = []
         models_contexts = []
@@ -190,9 +191,9 @@ class EarlyPredictionModel(object):
         preds = tf.concat(models_pred, -1)
 
         d1 = Dense(int(units/4), activation='relu')
-        dr1 = Dropout(opts['dropout'])
+        dr1 = Dropout(0.8)
         d2 = Dense(int(units/8), activation='relu')
-        dr2 = Dropout(opts['dropout'])
+        dr2 = Dropout(0.8)
         d3 = Dense(len(models), activation='relu')
         s = Softmax()
 
