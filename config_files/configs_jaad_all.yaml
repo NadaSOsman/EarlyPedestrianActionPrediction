@@ -1,0 +1,38 @@
+model_opts:
+  model: Static
+  backbone: vgg16
+  global_pooling: avg
+  obs_input_type: [pose] #possible types [pose, box, speed, local_context, local_box]
+  enlarge_ratio: 1.5 # enlarging the original bounding box to capture local spatial context
+  obs_length: 16
+  time_to_event: 30
+  min_encoding_len: 106
+  overlap: 0.8
+  balance_data: False # set to True to resample data so that the number of samples in each class is the same
+  apply_class_weights: True # apply class weights to offset class imbalance
+  dataset: jaad
+  normalize_boxes: True
+  generator: True # using generator is slower but uses less memory, otherwise up to 64GB RAM may be required to run some of the models
+  path_to_pose: /home/osman/storage/datasets/JAAD/JAAD/poses #path to poses features if used
+  batch_size: 128
+  hidden: 512
+  dropout: 0.0 #0.0 pose, 0.0 box, 0.5 local_context
+  interval: 30
+  classifier_activation: sigmoid
+  classifier_loss: binary_crossentropy
+  epochs: 100
+  optimizer: sgd
+  lr: 0.00005 
+  num_classes: 1
+  model_path: ./models #path to load and save models
+  step: 3
+  seq_len: 136
+  feat_size: 36 #feat_size for possible input typs: [36, 4, 1, 512, 512] 
+data_opts:
+  fstride: 1
+  sample_type: all  #beh or all for JAAD
+  subset: default
+  data_split_type: default  # kfold, random, default
+  seq_type: crossing
+  min_track_size: 16 # tracks shorter than this length will be discarded
+  path_to_dataset: /home/osman/storage/datasets/JAAD/JAAD/ #path to the images folder
