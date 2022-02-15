@@ -24,8 +24,13 @@ if __name__ == '__main__':
     parser = ArgumentParser(description="Train-Test program for Early_Intention_Prediction")
     parser.add_argument('--configs_file', type=str, help="Path to the directory to load the config file")
     parser.add_argument('--pretrain', action='store_true')
+    parser.add_argument('--t_forcing', action='store_true')
     parser.add_argument('--test', action='store_true')
     parser.add_argument('--fusion', action='store_true')
+    parser.add_argument('--goal_based', action='store_true')
+    parser.add_argument('--goal_conc', action='store_true')
+    parser.add_argument('--goal_att', action='store_true')
+    parser.add_argument('--goal_scheme', action='store_true')
 
     args = parser.parse_args()
 
@@ -35,7 +40,7 @@ if __name__ == '__main__':
     data_loader = DataLoader(opts=configs, fusion=args.fusion)
     data_generators = data_loader.get_data_generators(['train', 'test', 'val'])
 
-    early_pred_model = EarlyPredictionModel(opts=configs, data_generators=data_generators, pretrain=args.pretrain, fusion=args.fusion)
+    early_pred_model = EarlyPredictionModel(opts=configs, data_generators=data_generators, pretrain=args.pretrain, fusion=args.fusion, goal_based=args.goal_based, goal_conc=args.goal_conc, goal_att=args.goal_att, goal_scheme=args.goal_scheme)
 
     if not args.test:
         early_pred_model.train()

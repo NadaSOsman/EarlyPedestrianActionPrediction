@@ -1,3 +1,4 @@
+
 import os
 import sys
 import numpy as np
@@ -6,18 +7,25 @@ from functools import partial
 from itertools import product
 from tensorflow.keras.utils import Sequence, to_categorical, normalize
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Dense, LSTM, Dropout, RepeatVector, Lambda, GlobalMaxPooling2D, Concatenate, BatchNormalization, Softmax
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Input, Add, Dense, LSTM, Dropout, RepeatVector, Lambda, GlobalMaxPooling2D, Concatenate, BatchNormalization, Softmax, Average, Multiply, TimeDistributed
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 from early_pred_data_generator import DataGenerator, DataLoader
 from tensorflow.compat.v1.keras import backend as K
+import random
 
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 class EarlyPredictionModel(object):
-    def __init__(self, opts=None, data_generators={}, pretrain=False, fusion=False):
+    def __init__(self, opts=None, data_generators={}, pretrain=False, fusion=False, goal_based=False, goal_conc=False, goal_att=False, goal_scheme=False):
         self.opts = opts
         self.data_generators = data_generators
         self.pretrain = pretrain
         self.fusion = fusion
+        self.goal_based = goal_based
+        self.goal_conc = goal_conc
+        self.goal_att = goal_att
+        self.goal_scheme = goal_scheme
 
         if pretrain:
             model_name = "/pretrained_"+opts['model_opts']['dataset']+"_"+opts['data_opts']['sample_type']
@@ -25,6 +33,15 @@ class EarlyPredictionModel(object):
             model_name = "/fusion_"+opts['model_opts']['dataset']+"_"+opts['data_opts']['sample_type']
         else:
             model_name = "/trained_"+opts['model_opts']['dataset']+"_"+opts['data_opts']['sample_type']
+
+        if goal_based:
+            model_name += "_goal_based"
+        elif goal_scheme:
+            model_name += "_goal_based_scheme"
+        elif goal_conc:
+            model_name += "_goal_based_conc"
+        elif goal_att:
+            model_name += "_goal_based_att"
 
         self.model_path = opts['model_opts']['model_path']+model_name+'_'+\
                           '_'.join(opts['model_opts']['obs_input_type'])+'_'+\
@@ -52,7 +69,7 @@ class EarlyPredictionModel(object):
                                '_'.join(self.opts['model_opts']['obs_input_type'])+'_'+
                                str(self.opts['model_opts']['lr'])+'_'+
                                str(self.opts['model_opts']['hidden'])+'_'+
-                               '.h5', by_name=False, skip_mismatch=False)
+                               '.h5', by_name=True, skip_mismatch=False)
 
 
     def train(self):
@@ -82,6 +99,8 @@ class EarlyPredictionModel(object):
 
     def test(self):
         self.model.load_weights(self.model_path)
+        configs = self.opts
+        test_data = self.data_generators['test']
         test_results = self.model.predict(self.data_generators['test']['data'][0], verbose=1)
         test_results_array = np.array(np.round(test_results))
         average = 'binary'
@@ -173,13 +192,12 @@ class EarlyPredictionModel(object):
         return loss_func
 
     def fusion_rusltm(self, models=[]):
-        step = self.opts['step']
-        hidden = 512 #1024 for jaad_beh
-        units = 2*len(models)*hidden
+        step = self.opts['model_opts']['step']
+        units = 2*len(models)*self.opts['model_opts']['hidden']
         inputs = []
         models_pred = []
         models_contexts = []
-        seq_len = int((self.opts['seq_len']-self.opts['obs_length'])/step)
+        seq_len = int((self.opts['model_opts']['seq_len']-self.opts['model_opts']['obs_length'])/step)
         for model in models:
             for layer in model.layers:
                 layer._name = layer.name + str("__") + str(len(inputs))
@@ -193,7 +211,7 @@ class EarlyPredictionModel(object):
         d1 = Dense(int(units/4), activation='relu')
         dr1 = Dropout(0.8)
         d2 = Dense(int(units/8), activation='relu')
-        dr2 = Dropout(0.8)
+        dr2 = Dropout(0.8) #self.opts['model_opts']['dropout'])
         d3 = Dense(len(models), activation='relu')
         s = Softmax()
 
@@ -215,7 +233,7 @@ class EarlyPredictionModel(object):
         model = Model(inputs=inputs, outputs=outputs, name='fusion')
         return model
 
-    def rulstm(self, feat_size=40):
+    def rulstm(self, feat_size=40, t_forcing=True):
         input_seq = Input((self.opts['model_opts']['seq_len'], feat_size if self.fusion else self.opts['model_opts']['feat_size']))
         step = self.opts['model_opts']['step']
         sampled_seq = tf.concat([Lambda(lambda s: s[:,0:self.opts['model_opts']['obs_length']:step])(input_seq),\
@@ -228,6 +246,19 @@ class EarlyPredictionModel(object):
         c = None
         rolling_lstm = LSTM(self.opts['model_opts']['hidden'], dropout=self.opts['model_opts']['dropout'], return_state=True)
         unrolling_lstm = LSTM(self.opts['model_opts']['hidden'], dropout=self.opts['model_opts']['dropout'])
+
+        goal_proj = Sequential(name="proj")
+        inp_sz = feat_size if self.fusion else self.opts['model_opts']['feat_size']
+        goal_proj.add(Dense(3*inp_sz//2, input_shape=(2*inp_sz,), activation='relu', name="proj_0"))
+        goal_proj.add(Dense(inp_sz, name="proj_1"))
+
+        # insert model
+        goal_att_mod = Sequential(name="att")
+        att_in_sz = 2*self.opts['model_opts']['hidden']+inp_sz
+        goal_att_mod.add(Dense(att_in_sz//2, input_shape=(att_in_sz,), activation='relu', name="att_0"))
+        goal_att_mod.add(Dense(att_in_sz//3, activation="relu", name="att_1"))
+        goal_att_mod.add(Dense(1, activation="sigmoid", name="att_2"))
+
         for i in range(seq_len):
             input = Lambda(lambda s,i=i: s[:,i:i+1])(sampled_seq)
             if(h != None and c != None):
@@ -236,10 +267,47 @@ class EarlyPredictionModel(object):
                 _, h, c = rolling_lstm(input)
 
             if self.pretrain:
-                input_unrolling = Lambda(lambda s,i=i: s[:,i:])(sampled_seq)
+                if t_forcing:
+                    print("building t_forcing")
+                    def tf_shuffle(s, i, seq_len):
+                        return K.switch(K.less(K.random_uniform((1,)), K.constant(0.5)), s[:,i:], K.repeat(s[:,i], seq_len-i))
+                    input_unrolling = Lambda(lambda s,i=i, seq_len=seq_len: tf_shuffle(s, i, seq_len))(sampled_seq)
+                else:
+                    input_unrolling = Lambda(lambda s,i=i: s[:,i:])(sampled_seq)
             else:
                 input_unrolling = RepeatVector(seq_len-i)(Lambda(lambda s,i=i: s[:,i])(sampled_seq))
-            x_h = unrolling_lstm(input_unrolling, initial_state=[h, c])
+
+            if self.goal_scheme:
+                print("building goals")
+                goal_data = RepeatVector(seq_len-i)(Lambda(lambda s,i=i: s[:,-1])(sampled_seq))
+                factor = i/(seq_len-1)
+                goal_f = tf.fill(tf.shape(goal_data), 1-factor)
+                input_f = tf.fill(tf.shape(goal_data), factor)
+                true_input_unrolling = Add()([Multiply()([goal_f, goal_data]), Multiply()([input_f, input_unrolling])])
+            elif self.goal_based:
+                goal_data = RepeatVector(seq_len-i)(Lambda(lambda s,i=i: s[:,-1])(sampled_seq))
+                true_input_unrolling = Average()([goal_data, input_unrolling])
+            elif self.goal_conc:
+                print("building goals conc")
+                goal_data = RepeatVector(seq_len-i)(Lambda(lambda s,i=i: s[:,-1])(sampled_seq))
+                conc_input = Concatenate(axis=-1)([goal_data, input_unrolling])
+                true_input_unrolling = TimeDistributed(goal_proj)(conc_input)
+            elif self.goal_att:
+                print("building goals att")
+                goal_data = Lambda(lambda s,i=i: s[:,-1])(sampled_seq)
+                factor = goal_att_mod(Concatenate(axis=-1)([goal_data, h, c]))
+
+                goal_f = tf.tile(1-factor, tf.constant([1, inp_sz], tf.int32))
+                input_f = tf.tile(factor, tf.constant([1, inp_sz], tf.int32))
+                print(goal_f)
+
+                goal_vec = RepeatVector(seq_len-i)(goal_data)
+                goal_f_vec = RepeatVector(seq_len-i)(goal_f)
+                input_f_vec = RepeatVector(seq_len-i)(input_f)
+                true_input_unrolling = Add()([Multiply()([goal_f_vec, goal_vec]), Multiply()([input_f_vec, input_unrolling])])
+            else:
+                true_input_unrolling = input_unrolling
+            x_h = unrolling_lstm(true_input_unrolling, initial_state=[h, c])
             x = Dropout(self.opts['model_opts']['dropout'])(x_h)
             x = Dense(int(self.opts['model_opts']['hidden']/2), activation='relu')(x)
             x = Dense(int(self.opts['model_opts']['hidden']/4), activation='relu')(x)
@@ -251,4 +319,5 @@ class EarlyPredictionModel(object):
 
         model_outputs = outputs+contexts if self.fusion else outputs
         model = Model(input_seq, model_outputs, name='rulstm')
+        
         return model
