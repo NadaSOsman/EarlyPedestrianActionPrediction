@@ -211,6 +211,10 @@ class DataLoader(object):
             lens = []
             for seq in d[k]:
                 seq_len = len(seq)
+                if len(seq)>136 and data_type == 'train':
+                    seqs.extend([seq[i:i+16]+seq[len(seq)-4*time_to_event:] for i in range(0,len(seq)-2*obs_length-4*time_to_event,3)])
+                    lens.extend([min(seq_len, obs_length+4*time_to_event) for i in range(0,len(seq)-2*obs_length-4*time_to_event,3)])
+                
                 if(int(len(seq)%(time_to_event+min_encoding_len))!=0):
                     seq = [seq[0]]*(time_to_event+min_encoding_len-int(len(seq)%(time_to_event+min_encoding_len)))+seq
                 seqs.extend([seq[len(seq)-obs_length-4*time_to_event:]])
