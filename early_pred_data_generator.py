@@ -124,6 +124,10 @@ class DataLoader(object):
 
         data_generators = {}
         for data_split in data_splits:
+            if data_split == 'train':
+                self.opts['data_opts']['min_track_size'] = 1
+            else:
+                self.opts['data_opts']['min_track_size'] = self.opts['model_opts']['obs_length'] + 2*tte
             if data_split == 'val':
                 data_raw = imdb.generate_data_trajectory_sequence('test', **self.opts['data_opts'])
             else:
