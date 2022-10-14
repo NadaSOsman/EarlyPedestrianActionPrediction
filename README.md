@@ -1,5 +1,15 @@
-# EarlyPedestrianActionPrediction
-Early prediction of pedestrian crossing action using rolling-unrolling LSTMs
+# Early Pedestrian Action Prediction
+This repository hosts the code related to the paper: ada Osman, Enrico Cancelli, Guglielmo Camporese, Pasquale Coscia, and Lamberto Ballan, “Early pedestrian intent prediction via features estimation,” ICIP, 2022.
+
+```
+@article{Osman2022EarlyPI,
+  title={Early Pedestrian Intent Prediction Via Features Estimation},
+  author={Nada Osman and Enrico Cancelli and Guglielmo Camporese and Pasquale Coscia and Lamberto Ballan},
+  journal={2022 IEEE International Conference on Image Processing (ICIP)},
+  booktitle={ICIP},
+  year={2022}
+}
+```
 
 ## Requirments
 1- Download and extract the JAAD and PIE datasets:    
