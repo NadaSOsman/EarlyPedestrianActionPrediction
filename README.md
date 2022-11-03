@@ -1,5 +1,5 @@
 # Early Pedestrian Action Prediction
-This repository hosts the code related to the paper: ada Osman, Enrico Cancelli, Guglielmo Camporese, Pasquale Coscia, and Lamberto Ballan, “Early pedestrian intent prediction via features estimation,” ICIP, 2022.
+This repository hosts the code related to the paper: Nada Osman, Enrico Cancelli, Guglielmo Camporese, Pasquale Coscia, and Lamberto Ballan, “Early pedestrian intent prediction via features estimation,” ICIP, 2022.
 
 ```
 @article{Osman2022EarlyPI,
@@ -28,11 +28,11 @@ This repository hosts the code related to the paper: ada Osman, Enrico Cancelli,
     
 2- Run the following command for the pretraining stage:    
    `python3 train_test.py --configs_file config_file/configs_jaad.yaml --pretrain` for JAAD    
-   `python3 train_test.py --configs_file config_file/configs_jaad.yaml --pretrain` for PIE (check the config file for the right configurations)    
+   `python3 train_test.py --configs_file config_file/configs_pie.yaml --pretrain` for PIE (check the config file for the right configurations)    
        
 3- Run the following command for the training stage:    
    `python3 train_test.py --configs_file config_file/configs_jaad.yaml` for JAAD    
-   `python3 train_test.py --configs_file config_file/configs_jaad.yaml` for PIE (check the config file for the right configurations)    
+   `python3 train_test.py --configs_file config_file/configs_pie.yaml` for PIE (check the config file for the right configurations)    
        
 4- Apply the training on all of the used input types    
 
